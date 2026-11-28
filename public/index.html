@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang='en'>
+    <head>
+        <meta charset='UTF-8'>
+        <meta name='viewport' content='width=device-width,initial-scale=1.0'>
+        <title>NINA | Cosmetics &amp; Beauty</title>
+        <link rel='preconnect' href='https://fonts.googleapis.com'>
+        <link href='https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap' rel='stylesheet'>
+        <link rel='stylesheet' href='/css/style.css'>
+         <link rel='manifest' href='/manifest.json'>
+         <meta name='theme-color' content='#1E1B18'>
+         <link rel='apple-touch-icon' href='/images/icon-192.png'>
+    </head>
+    <body>
+        <div class='announcement'>Free Mombasa delivery on orders over KES 4,000 &bull;
+             Instant M-Pesa &amp; 
+             Card Checkout
+             </div>
+             <header>
+                <div class='nav-inner'>
+                    <a href='/index.html' class='logo'>NINA</a>
+                    <nav>
+                            <a href='/index.html' class='active'>Home</a>
+                            <a href='/shop.html'>Shop</a>
+                            <a href='/about.html'>About</a>
+                            <a href='/contact.html'>Contact</a>
+                        </nav>
+                        <a href='/cart.html' class='cart-link'>Bag (<span id='cart-count'>0</span>)</a>
+                    </div>
+                </header>
+                <section class='container hero'>
+                    <div>
+                        <span style='font-size:0.78rem;text-transform:uppercase;letter-spacing:0.14em;color:var(--accent);font-weight:600;'>Botanical Beauty &bull; Made for Glow</span>
+                        <h1>Radiant skin, effortless beauty.</h1>
+                        <p>Clean, nourishing skincare and richly pigmented cosmetics crafted to celebrate your natural glow every day.</p>
+                        <a href='/shop.html' class='btn-primary'>Shop Collection</a>
+                    </div>
+                    <div class='hero-visual'>
+                        <img src='https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=1000&q=80' alt='RINA Cosmetics' onerror="this.style.display='none'">
+                    </div>
+                </section>
+                <section class='container'>
+                    <div style='display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:24px;'>
+                        <h2>Featured Favorites</h2>
+                        <a href='/shop.html' style='color:var(--accent);font-weight:500;'>View All &rarr;</a>
+                    </div>
+                    <div class='grid' id='featured-grid'></div>
+                </section>
+                <footer>
+                    <h2 style='letter-spacing:0.2em;color:#fff;margin-bottom:8px;'>NINA</h2>
+                    <p>Mombasa, Kenya &bull; hello@ninabeauty.co.ke</p>
+                </footer>
+                <script src='/js/products.js'></script>
+                <script src='/js/cart.js'></script>
+                <script>
+                    var fg=document.getElementById('featured-grid');
+                    fg.innerHTML=window.RINA_PRODUCTS.slice(0,3).map(function(p){
+                        var v=p.variants[0];
+                        return `<div class='card'><a class='card-img' href='/product.html?id=${p.id}'><img src='${v.img}' alt='${p.name}' onerror='this.style.display="none"'></a><div class='card-body'><a class='card-title' href='/product.html?id=${p.id}'>${p.name}</a><div style='font-weight:600;margin-bottom:12px;'>KES ${p.price.toLocaleString()}</div><button class='btn-secondary' onclick='addToCart(${p.id},0);alert("Added to bag!")'>Add to Bag</button></div></div>`;
+                    }).join('');
+                </script>
+            </body>
+        </html> 

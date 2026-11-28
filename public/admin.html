@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang='en'>
+    <head>
+        <meta charset='UTF-8'>
+        <meta name='viewport' content='width=device-width,initial-scale=1.0'>
+        <title>Orders Admin | RINA</title>
+        <link rel='stylesheet' href='/css/style.css'>
+         <link rel='manifest' href='/manifest.json'>
+         <meta name='theme-color' content='#1E1B18'>
+         <link rel='apple-touch-icon' href='/images/icon-192.png'>
+    </head>
+    <body>
+        <section class='container'>
+            <h1 style='font-size:2.2rem;margin-bottom:16px;'>RINA Orders Dashboard</h1>
+            <div style='display:flex;gap:10px;max-width:420px;margin-bottom:24px;'>
+                <input type='password' id='adm-key' placeholder='Enter ADMIN_KEY from .env' style='flex:1;padding:10px;border:1px solid var(--border);border-radius:6px;'>
+                <button class='btn-primary' onclick='loadOrders()'>Load Orders</button>
+            </div>
+            <div class='box' style='overflow-x:auto;'>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Reference</th>
+                            <th>Customer</th>
+                            <th>Phone</th>
+                            <th>Address</th>
+                            <th>Total</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody id='ord-body'></tbody>
+                </table>
+            </div>
+        </section>
+
+        <script>
+            async function loadOrders() {
+                var k = document.getElementById('adm-key').value;
+                var res = await fetch('/api/admin/orders?key=' + encodeURIComponent(k));
+                if (!res.ok) return alert('Wrong ADMIN_KEY');
+                var rows = await res.json();
+                document.getElementById('ord-body').innerHTML = rows.map(function(r) {
+                    return '<tr><td>' + r.reference + '</td><td>' + r.customer_name + '</td><td>' + r.phone + '</td><td>' + r.address + '</td><td>KES ' + r.total.toLocaleString() + '</td><td><strong>' + r.status + '</strong></td><td>' + r.created_at + '</td></tr>';
+                }).join('') || '<tr><td colspan=7>No orders yet.</td></tr>';
+            }
+        </script>
+    </body>
+</html> 

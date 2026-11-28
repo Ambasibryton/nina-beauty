@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang='en'>
+    <head>
+        <meta charset='UTF-8'>
+        <meta name='viewport' content='width=device-width,initial-scale=1.0'>
+        <title>Contact | RINA</title>
+        <link href='https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap' rel='stylesheet'>
+        <link rel='stylesheet' href='/css/style.css'>
+         <link rel='manifest' href='/manifest.json'>
+         <meta name='theme-color' content='#1E1B18'>
+         <link rel='apple-touch-icon' href='/images/icon-192.png'>
+    </head>
+    <body>
+        <header>
+            <div class='nav-inner'>
+                <a href='/index.html' class='logo'>RINA</a>
+                <nav>
+                    <a href='/index.html'>Home</a>
+                    <a href='/shop.html'>Shop</a>
+                    <a href='/about.html'>About</a>
+                    <a href='/contact.html' class='active'>Contact</a>
+                </nav>
+                <a href='/cart.html' class='cart-link'>Bag (<span id='cart-count'>0</span>)</a>
+            </div>
+        </header>
+        <section class='container'>
+            <h1 style='font-size:2.6rem;margin-bottom:24px;'>Contact RINA</h1>
+            <div class='two-col'>
+                <div class='box'>
+                    <h3 style='font-size:1.5rem;margin-bottom:12px;'>Visit or Reach Us</h3>
+                    <p style='margin-bottom:8px;'><strong>Pickup Studio:</strong> Nairobi CBD, Kenya</p>
+                    <p style='margin-bottom:8px;'><strong>Email:</strong> hello@rinabeauty.co.ke</p>
+                    <p style='margin-bottom:16px;'><strong>Phone / WhatsApp:</strong> +254 700 000 000</p>
+                    <a href='https://wa.me/254700000000' target='_blank' class='btn-secondary'>Chat on WhatsApp</a>
+                </div>
+                <form class='box' onsubmit='event.preventDefault();alert("Thank you! Our beauty team will reply shortly.");this.reset();'>
+                    <div class='form-group'>
+                        <label>Your Name</label>
+                        <input type='text' required>
+                    </div>
+                    <div class='form-group'>
+                        <label>Email</label>
+                        <input type='email' required>
+                    </div>
+                    <div class='form-group'>
+                        <label>Message</label>
+                        <textarea rows='4' required></textarea>
+                    </div>
+                    <button type='submit' class='btn-primary'>Send Message</button>
+                </form>
+            </div>
+        </section>
+
+        <script src='/js/products.js'></script>
+        <script src='/js/cart.js'></script>
+
+    </body>
+
+</html>

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang='en'>
+    <head>
+        <meta charset='UTF-8'>
+        <meta name='viewport' content='width=device-width,initial-scale=1.0'>
+        <title>Product Details | RINA</title>
+        <link href='https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap' rel='stylesheet'>
+        <link rel='stylesheet' href='/css/style.css'>
+         <link rel='manifest' href='/manifest.json'>
+         <meta name='theme-color' content='#1E1B18'>
+         <link rel='apple-touch-icon' href='/images/icon-192.png'>
+    </head>
+    <body>
+        <header>
+            <div class='nav-inner'>
+                <a href='/index.html' class='logo'>RINA</a>
+                <nav>
+                    <a href='/index.html'>Home</a>
+                    <a href='/shop.html' class='active'>Shop</a>
+                    <a href='/about.html'>About</a>
+                    <a href='/contact.html'>Contact</a>
+                </nav>
+                <a href='/cart.html' class='cart-link'>Bag (<span id='cart-count'>0</span>)</a>
+            </div>
+        </header>
+        <section class='container'>
+            <p style='margin-bottom:20px;'><a href='/shop.html' style='color:var(--muted);text-decoration:none;'>&larr; Back to Shop</a></p>
+            <div class='two-col' id='product-view'></div>
+        </section>
+        <footer>
+            <p>&copy; 2026 RINA Cosmetics</p>
+        </footer>
+        <script src='/js/products.js'></script>
+        <script src='/js/cart.js'></script>
+        <script>
+            var pid = parseInt(new URLSearchParams(window.location.search).get('id') || '1', 10);
+            var prod = window.RINA_PRODUCTS.find(function(x) {
+                return x.id === pid;
+            }) || window.RINA_PRODUCTS[0];
+            var vIdx = 0;
+
+            function renderDetail() {
+                var v = prod.variants[vIdx];
+                var sw = prod.variants.map(function(x, i) {
+                    return "<button class='swatch " + (i === vIdx ? 'active' : '') + "' style='background:" + x.color + "' onclick='vIdx=" + i + ";renderDetail();'></button>";
+                }).join('');
+
+                document.title = prod.name + ' | RINA';
+                document.getElementById('product-view').innerHTML = "<div class='hero-visual' style='min-height:460px;'><img src='" + v.img + "' alt='" + prod.name + "' onerror='this.style.display=\"none\"'></div><div><span style='font-size:0.8rem;text-transform:uppercase;color:var(--accent);font-weight:600;'>" + prod.category + "</span><h1 style='font-size:2.6rem;margin:6px 0 12px;'>" + prod.name + "</h1><div style='font-size:1.3rem;font-weight:600;margin-bottom:16px;'>KES " + prod.price.toLocaleString() + "</div><p style='color:var(--muted);margin-bottom:20px;'>" + prod.desc + "</p><div class='swatches'>" + sw + "<span style='font-size:0.88rem;color:var(--muted);'>Selected: <strong>" + v.label + "</strong></span></div><div style='display:flex;gap:12px;margin:22px 0;'><button class='btn-primary' onclick='addToCart(prod.id,vIdx);alert(\"Added to bag!\")'>Add to Bag</button><a href='/cart.html' class='btn-secondary'>Go to Bag</a></div><div class='box'><p style='margin-bottom:10px;'><strong>Ingredients:</strong> " + prod.ingredients + "</p><p><strong>How to Use:</strong> " + prod.usage + "</p></div></div>";
+            }
+            renderDetail();
+        </script>
+    </body>
+</html>

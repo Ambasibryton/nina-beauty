@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>Your Bag | RINA</title>
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#1E1B18" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
+    <header>
+      <div class="nav-inner">
+        <a href="/index.html" class="logo">RINA</a>
+        <nav>
+          <a href="/index.html">Home</a><a href="/shop.html">Shop</a
+          ><a href="/about.html">About</a><a href="/contact.html">Contact</a>
+        </nav>
+        <a href="/cart.html" class="cart-link"
+          >Bag (<span id="cart-count">0</span>)</a
+        >
+      </div>
+    </header>
+    <section class="container">
+      <h1 style="font-size: 2.5rem; margin-bottom: 24px">Your Shopping Bag</h1>
+      <div class="two-col">
+        <div class="box" id="cart-list"></div>
+        <div class="box">
+          <h3 style="font-size: 1.5rem; margin-bottom: 16px">Order Summary</h3>
+          <div class="form-group">
+            <label>Delivery Location</label
+            ><select
+              id="zone-select"
+              onchange="
+                setDeliveryFee(this.value);
+                drawCart();
+              "
+            >
+              <option value="300">
+                Nairobi &amp; Environs (KES 300, Free over 4,000)
+              </option>
+              <option value="500">Outside Nairobi / Courier (KES 500)</option>
+              <option value="0">Store Pickup - Nairobi CBD (Free)</option>
+            </select>
+          </div>
+          <div class="summary-row">
+            <span>Subtotal</span><span id="sub-val">KES 0</span>
+          </div>
+          <div class="summary-row">
+            <span>Delivery</span><span id="del-val">KES 0</span>
+          </div>
+          <div class="summary-row total">
+            <span>Total</span><span id="tot-val">KES 0</span>
+          </div>
+          <a
+            href="/checkout.html"
+            class="btn-primary"
+            style="width: 100%; text-align: center; margin-top: 16px"
+            >Proceed to Checkout</a
+          >
+        </div>
+      </div>
+    </section>
+    <script src="/js/products.js"></script>
+    <script src="/js/cart.js"></script>
+    <script>
+      function changeQty(i, d) {
+        var c = getCart();
+        c[i].qty += d;
+        if (c[i].qty <= 0) c.splice(i, 1);
+        saveCart(c);
+        drawCart();
+      }
+      function drawCart() {
+        document.getElementById("zone-select").value = String(getDeliveryFee());
+        var c = getCart();
+        var list = document.getElementById("cart-list");
+        if (!c.length) {
+          list.innerHTML = `<p style='color:var(--muted);'>Your bag is empty. <a href='/shop.html'>Continue shopping</a>.</p>`;
+        } else {
+          list.innerHTML = c
+            .map(function (item, i) {
+              return `<div style='display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border);'><div><strong>${item.name}</strong><div style='font-size:0.82rem;color:var(--muted);'>${item.variant} &bull; KES ${item.price.toLocaleString()}</div><div style='margin-top:6px;display:flex;gap:8px;align-items:center;'><button class='filter-btn' style='padding:2px 10px;' onclick='changeQty(${i},-1)'>-</button><span>${item.qty}</span><button class='filter-btn' style='padding:2px 10px;' onclick='changeQty(${i},1)'>+</button></div></div><strong>KES ${(item.price * item.qty).toLocaleString()}</strong></div>`;
+            })
+            .join("");
+        }
+        var t = calculateTotals();
+        document.getElementById("sub-val").textContent =
+          "KES " + t.subtotal.toLocaleString();
+        document.getElementById("del-val").textContent =
+          t.delivery === 0 && c.length
+            ? "FREE"
+            : "KES " + t.delivery.toLocaleString();
+        document.getElementById("tot-val").textContent =
+          "KES " + t.total.toLocaleString();
+      }
+      drawCart();
+    </script>
+  </body>
+</html>

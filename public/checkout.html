@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>Checkout | RINA</title>
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#1E1B18" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
+    <header>
+      <div class="nav-inner">
+        <a href="/index.html" class="logo">RINA</a>
+        <nav>
+          <a href="/shop.html">Back to Shop</a><a href="/cart.html">Edit Bag</a>
+        </nav>
+        <a href="/cart.html" class="cart-link"
+          >Bag (<span id="cart-count">0</span>)</a
+        >
+      </div>
+    </header>
+    <section class="container">
+      <h1 style="font-size: 2.5rem; margin-bottom: 24px">Checkout</h1>
+      <div
+        id="pay-status"
+        class="box"
+        style="
+          display: none;
+          margin-bottom: 24px;
+          border-color: var(--accent);
+          background: #fdf4f0;
+        "
+      ></div>
+      <div class="two-col">
+        <form class="box" onsubmit="submitOrder(event)">
+          <div class="form-group">
+            <label>Full Name</label
+            ><input
+              type="text"
+              id="cust-name"
+              required
+              placeholder="e.g. Amina Wanjiku"
+            />
+          </div>
+          <div class="form-group">
+            <label>Email Address (for receipt)</label
+            ><input
+              type="email"
+              id="cust-email"
+              required
+              placeholder="amina@example.com"
+            />
+          </div>
+          <div class="form-group">
+            <label>Delivery Address / Estate</label
+            ><input
+              type="text"
+              id="cust-address"
+              required
+              placeholder="e.g. Kilimani, Argwings Kodhek Rd"
+            />
+          </div>
+          <label
+            style="
+              display: block;
+              font-size: 0.85rem;
+              font-weight: 500;
+              margin-bottom: 6px;
+            "
+            >Payment Method</label
+          >
+          <div class="pay-tabs">
+            <button
+              type="button"
+              class="pay-tab active"
+              data-m="mpesa"
+              onclick="setMethod(this.dataset.m, this)"
+            >
+              M-Pesa STK Push</button
+            ><button
+              type="button"
+              class="pay-tab"
+              data-m="card"
+              onclick="setMethod(this.dataset.m, this)"
+            >
+              Visa / Mastercard
+            </button>
+          </div>
+          <div class="form-group" id="mpesa-box">
+            <label>M-Pesa Phone Number</label
+            ><input
+              type="tel"
+              id="mpesa-phone"
+              required
+              placeholder="0712 345 678"
+            />
+          </div>
+          <p
+            id="card-note"
+            style="
+              display: none;
+              font-size: 0.88rem;
+              color: var(--muted);
+              margin-bottom: 14px;
+            "
+          >
+            You will be redirected to Paystack secure checkout to enter your
+            Visa or Mastercard details.
+          </p>
+          <button
+            type="submit"
+            class="btn-primary"
+            id="pay-btn"
+            style="width: 100%"
+          >
+            Pay Now
+          </button>
+        </form>
+        <div class="box">
+          <h3 style="font-size: 1.5rem; margin-bottom: 14px">
+            Items in Your Order
+          </h3>
+          <div id="order-items"></div>
+          <div class="summary-row" style="margin-top: 14px">
+            <span>Subtotal</span><span id="c-sub">KES 0</span>
+          </div>
+          <div class="summary-row">
+            <span>Delivery</span><span id="c-del">KES 0</span>
+          </div>
+          <div class="summary-row total">
+            <span>Total</span><span id="c-tot">KES 0</span>
+          </div>
+        </div>
+      </div>
+    </section>
+    <script src="/js/products.js"></script>
+    <script src="/js/cart.js"></script>
+    <script>
+      var method = "mpesa";
+      function setMethod(m, el) {
+        method = m;
+        document.querySelectorAll(".pay-tab").forEach(function (t) {
+          t.classList.remove("active");
+        });
+        el.classList.add("active");
+        document.getElementById("mpesa-box").style.display =
+          m === "mpesa" ? "block" : "none";
+        document.getElementById("card-note").style.display =
+          m === "card" ? "block" : "none";
+        document.getElementById("mpesa-phone").required = m === "mpesa";
+      }
+      var c = getCart();
+      var t = calculateTotals();
+      document.getElementById("order-items").innerHTML =
+        c
+          .map(function (i) {
+            return `<div class='summary-row'><span>${i.qty}x ${i.name} (${i.variant})</span><span>KES ${(i.price * i.qty).toLocaleString()}</span></div>`;
+          })
+          .join("") || "<p>Your bag is empty.</p>";
+      document.getElementById("c-sub").textContent =
+        "KES " + t.subtotal.toLocaleString();
+      document.getElementById("c-del").textContent =
+        t.delivery === 0 && c.length
+          ? "FREE"
+          : "KES " + t.delivery.toLocaleString();
+      document.getElementById("c-tot").textContent =
+        "KES " + t.total.toLocaleString();
+      document.getElementById("pay-btn").textContent =
+        "Pay KES " + t.total.toLocaleString();
+      function pollMpesaStatus(ref, attempts) {
+        var box = document.getElementById("pay-status");
+        if (attempts <= 0) {
+          box.innerHTML = `<strong>Still waiting on confirmation.</strong> If you already entered your PIN, refresh or contact RINA with reference ${ref}.`;
+          document.getElementById("pay-btn").disabled = false;
+          return;
+        }
+        setTimeout(function () {
+          fetch("/api/orders/verify/" + encodeURIComponent(ref))
+            .then(function (r) {
+              return r.json();
+            })
+            .then(function (d) {
+              if (d.paid) {
+                localStorage.removeItem("rina_cart");
+                updateBagCount();
+                box.innerHTML = `<strong>Payment Confirmed!</strong> Thank you for shopping with RINA. Order Ref: <strong>${d.reference}</strong> (KES ${d.amount.toLocaleString()}). <a href='/shop.html'>Continue Shopping</a>`;
+                document.getElementById("pay-btn").textContent = "Paid";
+              } else if (d.status === "failed" || d.status === "abandoned") {
+                box.innerHTML =
+                  "<strong>Payment was not completed.</strong> Please try again.";
+                document.getElementById("pay-btn").disabled = false;
+                document.getElementById("pay-btn").textContent =
+                  "Pay KES " + t.total.toLocaleString();
+              } else {
+                pollMpesaStatus(ref, attempts - 1);
+              }
+            })
+            .catch(function () {
+              pollMpesaStatus(ref, attempts - 1);
+            });
+        }, 3000);
+      }
+      async function submitOrder(e) {
+        e.preventDefault();
+        c = getCart();
+        if (!c.length) return alert("Your bag is empty.");
+        var btn = document.getElementById("pay-btn");
+        var box = document.getElementById("pay-status");
+        btn.disabled = true;
+        btn.textContent = "Processing...";
+        try {
+          var res = await fetch("/api/checkout", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              cart: c,
+              deliveryFee: getDeliveryFee(),
+              customerName: document.getElementById("cust-name").value,
+              email: document.getElementById("cust-email").value,
+              phone: document.getElementById("mpesa-phone").value,
+              address: document.getElementById("cust-address").value,
+              method: method,
+            }),
+          });
+          var data = await res.json();
+          if (!data.success) {
+            alert(data.error || "Payment error");
+            btn.disabled = false;
+            btn.textContent = "Pay KES " + t.total.toLocaleString();
+            return;
+          }
+          if (data.mode === "stk_push") {
+            box.style.display = "block";
+            box.innerHTML = `<strong>M-Pesa Prompt Sent!</strong> ${data.displayText} (Order Ref: ${data.reference}). Waiting for confirmation...`;
+            btn.textContent = "Waiting for M-Pesa PIN...";
+            pollMpesaStatus(data.reference, 40);
+          } else if (data.checkoutUrl) {
+            window.location.href = data.checkoutUrl;
+          }
+        } catch (err) {
+          alert("Network error. Please try again.");
+          btn.disabled = false;
+          btn.textContent = "Pay KES " + t.total.toLocaleString();
+        }
+      }
+    </script>
+  </body>
+</html>
