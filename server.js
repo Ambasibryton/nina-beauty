@@ -1,8 +1,9 @@
 require("dotenv").config();
 var express = require("express");
 var crypto = require("crypto");
-var sqlite3 = require("sqlite3").verbose();
 var path = require("path");
+var sqlite = require("node:sqlite");
+var Database = sqlite.DatabaseSync || sqlite.Database;
 var app = express();
 app.use(
   express.json({
@@ -12,16 +13,13 @@ app.use(
   }),
 );
 app.use(express.static(path.join(__dirname, "public")));
-var db = new sqlite3.Database(path.join(__dirname, "rina.db"));
-db.serialize(function () {
-  db.run(
-    "CREATE TABLE IF NOT EXISTS orders (id INTEGER PRIMARY KEY AUTOINCREMENT, reference TEXT UNIQUE NOT NULL, customer_name TEXT NOT NULL, customer_email TEXT NOT NULL, phone TEXT, address TEXT NOT NULL, items_json TEXT NOT NULL, subtotal INTEGER NOT NULL, delivery INTEGER NOT NULL, total INTEGER NOT NULL, payment_channel TEXT, status TEXT NOT NULL, checkout_request_id TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)",
-  );
-  db.run(
-    "ALTER TABLE orders ADD COLUMN checkout_request_id TEXT",
-    function () {},
-  );
-});
+var db = new Database(path.join(__dirname, "rina.db"));
+db.exec(
+  "CREATE TABLE IF NOT EXISTS orders (id INTEGER PRIMARY KEY AUTOINCREMENT, reference TEXT UNIQUE NOT NULL, customer_name TEXT NOT NULL, customer_email TEXT NOT NULL, phone TEXT, address TEXT NOT NULL, items_json TEXT NOT NULL, subtotal INTEGER NOT NULL, delivery INTEGER NOT NULL, total INTEGER NOT NULL, payment_channel TEXT, status TEXT NOT NULL, checkout_request_id TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)",
+);
+try {
+  db.exec("ALTER TABLE orders ADD COLUMN checkout_request_id TEXT");
+} catch (e) {}
 var CATALOG_PRICES = {};
 require(path.join(__dirname, "products.json")).forEach(function (p) {
   CATALOG_PRICES[p.id] = p.price;
@@ -89,28 +87,21 @@ app.post("/api/checkout", async function (req, res) {
     var total = subtotal + shipping;
     var reference =
       "RINA-" + Date.now() + "-" + Math.floor(1000 + Math.random() * 9000);
-    await new Promise(function (resolve, reject) {
-      db.run(
-        "INSERT INTO orders (reference,customer_name,customer_email,phone,address,items_json,subtotal,delivery,total,payment_channel,status) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-        [
-          reference,
-          b.customerName,
-          b.email,
-          b.phone || "",
-          b.address,
-          JSON.stringify(b.cart),
-          subtotal,
-          shipping,
-          total,
-          b.method,
-          "PENDING",
-        ],
-        function (err) {
-          if (err) reject(err);
-          else resolve();
-        },
-      );
-    });
+    db.prepare(
+      "INSERT INTO orders (reference,customer_name,customer_email,phone,address,items_json,subtotal,delivery,total,payment_channel,status) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+    ).run(
+      reference,
+      b.customerName,
+      b.email,
+      b.phone || "",
+      b.address,
+      JSON.stringify(b.cart),
+      subtotal,
+      shipping,
+      total,
+      b.method,
+      "PENDING",
+    );
     if (b.method === "mpesa") {
       if (!b.phone)
         return res
@@ -159,10 +150,9 @@ app.post("/api/checkout", async function (req, res) {
               "Daraja STK Push failed.",
           });
       }
-      db.run("UPDATE orders SET checkout_request_id=? WHERE reference=?", [
-        stkData.CheckoutRequestID,
-        reference,
-      ]);
+      db.prepare(
+        "UPDATE orders SET checkout_request_id=? WHERE reference=?",
+      ).run(stkData.CheckoutRequestID, reference);
       return res.json({
         success: true,
         mode: "stk_push",
@@ -217,107 +207,94 @@ app.post("/api/webhooks/daraja", function (req, res) {
   var cb = req.body && req.body.Body && req.body.Body.stkCallback;
   if (cb && cb.CheckoutRequestID) {
     var newStatus = cb.ResultCode === 0 ? "PAID" : "FAILED";
-    db.run("UPDATE orders SET status=? WHERE checkout_request_id=?", [
+    db.prepare("UPDATE orders SET status=? WHERE checkout_request_id=?").run(
       newStatus,
       cb.CheckoutRequestID,
-    ]);
+    );
   }
   res.json({ ResultCode: 0, ResultDesc: "Accepted" });
 });
-app.get("/api/orders/verify/:reference", function (req, res) {
+app.get("/api/orders/verify/:reference", async function (req, res) {
   var reference = req.params.reference;
-  db.get(
-    "SELECT status,total,payment_channel,checkout_request_id FROM orders WHERE reference=?",
-    [reference],
-    async function (err, row) {
-      if (!row) return res.json({ paid: false, status: "not_found" });
-      if (row.status === "PAID")
+  var row = db
+    .prepare(
+      "SELECT status,total,payment_channel,checkout_request_id FROM orders WHERE reference=?",
+    )
+    .get(reference);
+  if (!row) return res.json({ paid: false, status: "not_found" });
+  if (row.status === "PAID")
+    return res.json({ paid: true, reference: reference, amount: row.total });
+  if (row.status === "FAILED")
+    return res.json({ paid: false, status: "failed" });
+  try {
+    if (row.payment_channel === "mpesa" && row.checkout_request_id) {
+      var sc = process.env.DARAJA_SHORTCODE || "174379";
+      var pk =
+        process.env.DARAJA_PASSKEY ||
+        "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919";
+      var ts = darajaTimestamp();
+      var pw = Buffer.from(sc + pk + ts).toString("base64");
+      var token = await getDarajaToken();
+      var qRes = await fetch(darajaBase() + "/mpesa/stkpushquery/v1/query", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + token,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          BusinessShortCode: sc,
+          Password: pw,
+          Timestamp: ts,
+          CheckoutRequestID: row.checkout_request_id,
+        }),
+      });
+      var qData = await qRes.json();
+      if (String(qData.ResultCode) === "0") {
+        db.prepare("UPDATE orders SET status=? WHERE reference=?").run(
+          "PAID",
+          reference,
+        );
         return res.json({
           paid: true,
           reference: reference,
           amount: row.total,
         });
-      if (row.status === "FAILED")
-        return res.json({ paid: false, status: "failed" });
-      try {
-        if (row.payment_channel === "mpesa" && row.checkout_request_id) {
-          var sc = process.env.DARAJA_SHORTCODE || "174379";
-          var pk =
-            process.env.DARAJA_PASSKEY ||
-            "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919";
-          var ts = darajaTimestamp();
-          var pw = Buffer.from(sc + pk + ts).toString("base64");
-          var token = await getDarajaToken();
-          var qRes = await fetch(
-            darajaBase() + "/mpesa/stkpushquery/v1/query",
-            {
-              method: "POST",
-              headers: {
-                Authorization: "Bearer " + token,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                BusinessShortCode: sc,
-                Password: pw,
-                Timestamp: ts,
-                CheckoutRequestID: row.checkout_request_id,
-              }),
-            },
-          );
-          var qData = await qRes.json();
-          if (String(qData.ResultCode) === "0") {
-            db.run("UPDATE orders SET status=? WHERE reference=?", [
-              "PAID",
-              reference,
-            ]);
-            return res.json({
-              paid: true,
-              reference: reference,
-              amount: row.total,
-            });
-          }
-          if (
-            qData.ResultCode !== undefined &&
-            String(qData.ResultCode) !== "0"
-          ) {
-            db.run("UPDATE orders SET status=? WHERE reference=?", [
-              "FAILED",
-              reference,
-            ]);
-            return res.json({ paid: false, status: "failed" });
-          }
-          return res.json({ paid: false, status: "pending" });
-        }
-        var psRes = await fetch(
-          "https://api.paystack.co/transaction/verify/" +
-            encodeURIComponent(reference),
-          {
-            headers: {
-              Authorization: "Bearer " + process.env.PAYSTACK_SECRET_KEY,
-            },
-          },
-        );
-        var psData = await psRes.json();
-        if (psData.status && psData.data && psData.data.status === "success") {
-          db.run("UPDATE orders SET status=? WHERE reference=?", [
-            "PAID",
-            reference,
-          ]);
-          return res.json({
-            paid: true,
-            reference: reference,
-            amount: psData.data.amount / 100,
-          });
-        }
-        res.json({
-          paid: false,
-          status: psData.data ? psData.data.status : "pending",
-        });
-      } catch (e) {
-        res.json({ paid: false, status: "pending" });
       }
-    },
-  );
+      if (qData.ResultCode !== undefined && String(qData.ResultCode) !== "0") {
+        db.prepare("UPDATE orders SET status=? WHERE reference=?").run(
+          "FAILED",
+          reference,
+        );
+        return res.json({ paid: false, status: "failed" });
+      }
+      return res.json({ paid: false, status: "pending" });
+    }
+    var psRes = await fetch(
+      "https://api.paystack.co/transaction/verify/" +
+        encodeURIComponent(reference),
+      {
+        headers: { Authorization: "Bearer " + process.env.PAYSTACK_SECRET_KEY },
+      },
+    );
+    var psData = await psRes.json();
+    if (psData.status && psData.data && psData.data.status === "success") {
+      db.prepare("UPDATE orders SET status=? WHERE reference=?").run(
+        "PAID",
+        reference,
+      );
+      return res.json({
+        paid: true,
+        reference: reference,
+        amount: psData.data.amount / 100,
+      });
+    }
+    res.json({
+      paid: false,
+      status: psData.data ? psData.data.status : "pending",
+    });
+  } catch (e) {
+    res.json({ paid: false, status: "pending" });
+  }
 });
 app.post("/api/webhooks/paystack", function (req, res) {
   var hash = crypto
@@ -327,24 +304,24 @@ app.post("/api/webhooks/paystack", function (req, res) {
   if (hash !== req.headers["x-paystack-signature"]) return res.sendStatus(401);
   var event = req.body;
   if (event.event === "charge.success" && event.data && event.data.reference) {
-    db.run("UPDATE orders SET status=? WHERE reference=?", [
+    db.prepare("UPDATE orders SET status=? WHERE reference=?").run(
       "PAID",
       event.data.reference,
-    ]);
+    );
   }
   res.sendStatus(200);
 });
 app.get("/api/admin/orders", function (req, res) {
   if (req.query.key !== process.env.ADMIN_KEY)
     return res.status(403).json({ error: "Unauthorized" });
-  db.all(
-    "SELECT * FROM orders ORDER BY created_at DESC",
-    [],
-    function (err, rows) {
-      if (err) return res.status(500).json({ error: "DB error" });
-      res.json(rows);
-    },
-  );
+  try {
+    var rows = db
+      .prepare("SELECT * FROM orders ORDER BY created_at DESC")
+      .all();
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: "DB error" });
+  }
 });
 app.listen(process.env.PORT || 3000, function () {
   console.log(
